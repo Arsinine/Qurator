@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ github.ref_name }}';
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Qurator ${tag}`,
+              body: 'See the assets below to download this version.',
+              draft: true,
+            });
+            return data.id;
+
+  build-tauri:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Verify updater signing secret is set
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY repo secret is not set."
+            echo "::error::Without it tauri-action skips latest.json and the in-app updater"
+            echo "::error::fails with 'Could not fetch a valid release JSON from the remote'."
+            echo "::error::Generate a key with 'cargo tauri signer generate' and add it to"
+            echo "::error::repo Settings → Secrets → Actions as TAURI_SIGNING_PRIVATE_KEY."
+            exit 1
+          fi
+
+      - name: Sync app version with git tag
+        shell: bash
+        run: |
+          # Tag is like 'v0.2.5'; strip the leading 'v'.
+          tag='${{ github.ref_name }}'
+          version="${tag#v}"
+          echo "Bumping app version → $version"
+          # Cargo.toml: replace only the package version, not dependency versions.
+          # The package block's first 'version = "..."' line is what we target.
+          python3 - "$version" <<'PY'
+          import re, sys
+          v = sys.argv[1]
+          path = 'app/src-tauri/Cargo.toml'
+          with open(path) as f: src = f.read()
+          # Replace the first version assignment in the [package] section.
+          new = re.sub(
+              r'(\[package\][^\[]*?\nversion\s*=\s*)"[^"]+"',
+              r'\1"' + v + '"',
+              src,
+              count=1,
+              flags=re.S,
+          )
+          assert re.search(
+              r'\[package\][^\[]*?\nversion\s*=\s*"' + re.escape(v) + r'"',
+              new,
+              flags=re.S,
+          ), f"failed to set version {v} in {path}"
+          with open(path, 'w') as f: f.write(new)
+          PY
+          # tauri.conf.json: top-level "version".
+          python3 - "$version" <<'PY'
+          import json, sys
+          v = sys.argv[1]
+          path = 'app/src-tauri/tauri.conf.json'
+          with open(path) as f: cfg = json.load(f)
+          cfg['version'] = v
+          with open(path, 'w') as f: json.dump(cfg, f, indent=2)
+          PY
+          # Also refresh Cargo.lock so the tauri build doesn't fail with --locked.
+          cargo update -p qurator --precise "$version" || true
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release-id }}
+          projectPath: app
+          args: ${{ matrix.args }}
+          # Generate platform-specific updater metadata; tauri-action merges
+          # per-platform entries into a single latest.json on the release.
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+      - name: Upload portable exe and zip
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = "Qurator_${{ github.ref_name }}.exe"
+          $zip = "Qurator_${{ github.ref_name }}_windows_x64_portable.zip"
+          Copy-Item "target/release/qurator.exe" $exe
+          Compress-Archive -Path $exe -DestinationPath $zip
+          gh release upload '${{ github.ref_name }}' $exe $zip --repo ${{ github.repository }}
+
+  publish-release:
+    needs: [create-release, build-tauri]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit '${{ github.ref_name }}' --draft=false --repo ${{ github.repository }}
