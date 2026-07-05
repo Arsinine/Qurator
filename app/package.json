@@ -1,0 +1,33 @@
+{
+  "name": "qurator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "prepare": "svelte-kit sync || echo ''",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.69.1",
+    "@sveltejs/vite-plugin-svelte": "7.1.2",
+    "@skeletonlabs/skeleton": "4.15.2",
+    "@skeletonlabs/skeleton-svelte": "4.15.2",
+    "@tailwindcss/vite": "4.3.2",
+    "@tauri-apps/cli": "2.11.4",
+    "@types/node": "26.1.0",
+    "svelte": "5.56.4",
+    "svelte-check": "4.7.1",
+    "tailwindcss": "4.3.2",
+    "typescript": "6.0.3",
+    "vite": "8.1.3"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "virtua": "0.49.2"
+  }
+}

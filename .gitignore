@@ -1,0 +1,47 @@
+# Rust
+/target/
+**/target/
+Cargo.lock.bak
+
+# Node / frontend
+node_modules/
+app/.svelte-kit/
+app/build/
+app/dist/
+app/src-tauri/target/
+app/src-tauri/gen/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local settings (machine-specific, not shared)
+.claude/settings.local.json
+
+# Spike workspace: large build artifacts, VM keys, and nested git repos
+# (spike/ is owned by a concurrent agent; keep the root repo out of its way)
+spike/**/target/
+spike/**/node_modules/
+spike/**/*.pem
+spike/**/*.key
+spike/**/id_rsa*
+spike/**/id_ed25519*
+spike/**/*.ppk
+
+# spike/cr-pb and spike/iroh-peer are their own git repos (nested .git/).
+# cr-pb has no commits yet, which makes `git add -A` at the root fail with
+# "does not have a commit checked out" if this directory isn't excluded -
+# ignore both wholesale rather than let the root repo track a foreign repo.
+/spike/cr-pb/
+/spike/iroh-peer/
