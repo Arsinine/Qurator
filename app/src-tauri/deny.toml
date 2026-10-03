@@ -1,0 +1,52 @@
+# Supply-chain policy. Run: cargo deny check (cargo-deny 0.20.x)
+
+[advisories]
+version = 2
+# Ignores below are unmaintained transitive deps of the tauri/gtk
+# tree with no fix available; re-check whenever tauri bumps its deps.
+ignore = [
+    "RUSTSEC-2024-0370", # proc-macro-error unmaintained, no replacement release
+    "RUSTSEC-2025-0081", # unic-char-property unmaintained (via urlpattern <- tauri-utils)
+    "RUSTSEC-2025-0075", # unic-char-range unmaintained (via urlpattern <- tauri-utils)
+    "RUSTSEC-2025-0080", # unic-common unmaintained (via urlpattern <- tauri-utils)
+    "RUSTSEC-2025-0100", # unic-ucd-ident unmaintained (via urlpattern <- tauri-utils)
+    "RUSTSEC-2025-0098", # unic-ucd-version unmaintained (via urlpattern <- tauri-utils)
+]
+
+[licenses]
+version = 2
+# Project license is AGPL-3.0 (GPL-compatible), so permissive and
+# weak-copyleft licenses are all acceptable.
+allow = [
+    "AGPL-3.0-or-later",
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "LGPL-2.1-or-later",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+# The workspace crate has no license field in Cargo.toml yet; it is AGPL-3.0.
+[[licenses.clarify]]
+name = "qurator"
+expression = "AGPL-3.0-or-later"
+license-files = []
+
+[bans]
+# Tauri trees duplicate crates heavily; warn rather than deny.
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
