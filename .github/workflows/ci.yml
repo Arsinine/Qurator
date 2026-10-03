@@ -97,6 +97,8 @@ jobs:
         working-directory: app
         run: npm run build
 
+      # Updater artifacts must be signed, and only release.yml holds the
+      # signing key. CI proves the app bundles; signing stays release-only.
       - name: Debug bundle build
         working-directory: app
-        run: npm run tauri build -- --debug
+        run: npm run tauri build -- --debug --config '{"bundle":{"createUpdaterArtifacts":false}}'
