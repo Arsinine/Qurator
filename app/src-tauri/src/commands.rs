@@ -171,7 +171,6 @@ pub async fn list_works(
 ) -> Result<WorksPage, String> {
     let db_path = state.db_path.clone();
     let offset = offset.max(0);
-    let limit = limit.clamp(1, MAX_PAGE_SIZE);
 
     tauri::async_runtime::spawn_blocking(move || {
         let conn = db::open_reader(&db_path).map_err(|e| e.to_string())?;
@@ -187,6 +186,9 @@ fn list_works_tx(
     limit: i64,
     medium_filter: Option<&str>,
 ) -> Result<WorksPage, String> {
+    // Clamped here rather than in the `list_works` command so every caller of
+    // this transaction helper is bounded, not just the async command.
+    let limit = limit.clamp(1, MAX_PAGE_SIZE);
     let total: i64 = match medium_filter {
         Some(medium) => conn
             .query_row(
@@ -310,5 +312,30 @@ mod tests {
         let first_page = list_works_tx(&conn, 0, 2, None).unwrap();
         assert_eq!(first_page.items.len(), 2);
         assert_eq!(first_page.total, 3);
+    }
+
+    #[test]
+    fn sem_b6_list_works_clamps_requested_limit() {
+        let conn = migrated_conn();
+        let collection_id = db::ensure_default_collection(&conn).unwrap();
+
+        // Seed more than MAX_PAGE_SIZE works in a single statement.
+        conn.execute(
+            "INSERT INTO works (collection_id, title, medium_type, container_type) \
+             WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 501) \
+             SELECT ?1, 'work-' || n, 'image', 'standalone' FROM seq",
+            [collection_id],
+        )
+        .unwrap();
+
+        // A request far above MAX_PAGE_SIZE is clamped down to 500 rows.
+        let huge = list_works_tx(&conn, 0, 999_999, None).unwrap();
+        assert_eq!(huge.items.len(), 500);
+
+        // The lower clamp: 0 and negative limits still yield at least one row.
+        let zero = list_works_tx(&conn, 0, 0, None).unwrap();
+        assert!(!zero.items.is_empty());
+        let negative = list_works_tx(&conn, 0, -5, None).unwrap();
+        assert!(!negative.items.is_empty());
     }
 }
