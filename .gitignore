@@ -45,3 +45,7 @@ spike/**/*.ppk
 # ignore both wholesale rather than let the root repo track a foreign repo.
 /spike/cr-pb/
 /spike/iroh-peer/
+
+# Markdown docs stay local (owner, 2026-10-03); only README is published
+*.md
+!README.md

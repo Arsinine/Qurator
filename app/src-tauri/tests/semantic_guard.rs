@@ -2,9 +2,8 @@
 //!
 //! Source-tree sweeps: A1 (frontend has no network/SQL surface), A2
 //! (`Connection::open*` only in `db.rs`), A4 (write-capable file APIs only in
-//! the — M0-empty — allowlist), A5 (no identity/sync dependencies), A6
-//! (`SPEC_VERSION` tracks the SPEC.md `**Version:**` header). The sweeps only
-//! walk `app/src` and `app/src-tauri/src`, never `tests/`, so the needle
+//! the — M0-empty — allowlist), A5 (no identity/sync dependencies). The sweeps
+//! only walk `app/src` and `app/src-tauri/src`, never `tests/`, so the needle
 //! literals in this file are not self-hits.
 
 use std::fs;
@@ -253,25 +252,6 @@ fn sem_a5_no_sync_or_identity_deps_in_1_0() {
         hits.is_empty(),
         "A5 violated: identity/sync dependencies are banned in 1.0:\n{}",
         hits.join("\n")
-    );
-}
-
-/// A6: the `SPEC_VERSION` constant equals the `**Version:**` header of
-/// SPEC.md. A missing or malformed SPEC.md is a failure, never a skip.
-#[test]
-fn sem_a6_spec_version_constant_matches_spec_header() {
-    let spec = manifest_dir().join("../../SPEC.md");
-    let src = fs::read_to_string(&spec)
-        .unwrap_or_else(|e| panic!("A6: cannot read SPEC.md at {}: {e}", spec.display()));
-    let header = src
-        .lines()
-        .find(|line| line.starts_with("**Version:**"))
-        .unwrap_or_else(|| panic!("A6: no `**Version:**` header line in {}", spec.display()));
-    let version = header["**Version:**".len()..].trim();
-    assert_eq!(
-        version,
-        qurator_lib::SPEC_VERSION,
-        "A6: SPEC_VERSION must equal the **Version:** header of SPEC.md"
     );
 }
 

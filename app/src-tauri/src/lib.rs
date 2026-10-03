@@ -6,9 +6,6 @@ use commands::AppState;
 use tauri::Manager;
 use write_queue::WriteQueue;
 
-/// Version of the spec this build implements (SEMANTIC_MODEL.md Tier A, A6).
-pub const SPEC_VERSION: &str = "3.8";
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
